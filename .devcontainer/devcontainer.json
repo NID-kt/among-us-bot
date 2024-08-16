@@ -12,7 +12,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "nvm install 20 && nvm use 20 && pnpm install"
+	"postCreateCommand": "bash -i -c 'nvm install 20 && nvm use 20 && pnpm install'"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
