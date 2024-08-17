@@ -84,10 +84,14 @@ client.once('ready', async () => {
 async function setMuteAllPlayers(interaction: Interaction, mute: boolean) {
   const channel = await interaction.guild?.channels.fetch(process.env.PLAYING_CHANNEL_ID as string);
   if (channel?.isVoiceBased()) {
+    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    const promises: Promise<any>[] = [];
     for (const member of channel.members) {
       if (member[1].user.bot) continue;
-      await member[1].voice.setMute(mute);
+      promises.push(member[1].voice.setMute(mute));
     }
+
+    await Promise.all(promises);
   }
 }
 
@@ -188,11 +192,13 @@ client.on('interactionCreate', async (interaction) => {
       }
       await interaction.reply('VCの中継を停止しました');
     } else if (interaction.commandName === 'mute-all-players') {
+      await interaction.deferReply();
       await setMuteAllPlayers(interaction, true);
-      await interaction.reply('ミュートを設定しました');
+      await interaction.followUp('ミュートを設定しました');
     } else if (interaction.commandName === 'unmute-all-players') {
+      await interaction.deferReply();
       await setMuteAllPlayers(interaction, false);
-      await interaction.reply('ミュートを設定解除しました');
+      await interaction.followUp('ミュートを設定解除しました');
     }
   }
 });
