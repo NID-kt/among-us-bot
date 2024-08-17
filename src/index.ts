@@ -15,6 +15,7 @@ import {
   joinVoiceChannel,
   NoSubscriberBehavior,
   StreamType,
+  VoiceConnection,
   VoiceConnectionStatus
 } from '@discordjs/voice';
 import prism from 'prism-media';
@@ -95,7 +96,20 @@ async function setMuteAllPlayers(interaction: Interaction, mute: boolean) {
   }
 }
 
+function playSound(input: string, connection: VoiceConnection) {
+  const player = createAudioPlayer({
+    behaviors: {
+      noSubscriber: NoSubscriberBehavior.Play,
+    },
+  });
+  const resource = createAudioResource(input);
+  player.play(resource);
+  connection.subscribe(player);
+}
+
 let abortController: AbortController | null = null;
+let watchConnection: VoiceConnection | null = null;
+let playConnection: VoiceConnection | null = null;
 
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand()) {
@@ -106,7 +120,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       abortController = new AbortController();
-      const watchConnection = joinVoiceChannel({
+      watchConnection = joinVoiceChannel({
         group: 'speaker',
         channelId: process.env.WATCHING_CHANNEL_ID as string,
         guildId: interaction.guild?.id as string,
@@ -114,7 +128,7 @@ client.on('interactionCreate', async (interaction) => {
         selfMute: true,
         selfDeaf: false,
       });
-      const playConnection = joinVoiceChannel({
+      playConnection = joinVoiceChannel({
         group: 'listener',
         channelId: process.env.PLAYING_CHANNEL_ID as string,
         guildId: interaction.guild?.id as string,
@@ -137,6 +151,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const receiver = playConnection.receiver;
       receiver.speaking.on('start', (userId) => {
+        if (watchConnection == null) return;
         const standaloneInput = new Input({
           channels: 2,
           bitDepth: 16,
@@ -182,8 +197,10 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply('VCを中継を開始しました');
 
       abortController.signal.addEventListener('abort', () => {
-        playConnection.destroy();
-        watchConnection.destroy();
+        playConnection?.destroy();
+        playConnection = null;
+        watchConnection?.destroy();
+        watchConnection = null;
       });
     } else if (interaction.commandName === 'stop-sync') {
       if (abortController != null) {
@@ -194,10 +211,16 @@ client.on('interactionCreate', async (interaction) => {
     } else if (interaction.commandName === 'mute-all-players') {
       await interaction.deferReply();
       await setMuteAllPlayers(interaction, true);
+      if (playConnection != null) {
+        playSound('sounds/discord-mute.mp3', playConnection);
+      }
       await interaction.followUp('ミュートを設定しました');
     } else if (interaction.commandName === 'unmute-all-players') {
       await interaction.deferReply();
       await setMuteAllPlayers(interaction, false);
+      if (playConnection != null) {
+        playSound('sounds/discord-unmute.mp3', playConnection);
+      }
       await interaction.followUp('ミュートを設定解除しました');
     }
   }
